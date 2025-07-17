@@ -1,0 +1,22 @@
+[project]
+name = "tabula"
+version = "0.1.0"
+description = "Tabular manipulation on the command line"
+readme = "README.md"
+authors = [
+    { name = "henrywatkins", email = "h.watkins@hotmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "black>=25.1.0",
+    "click>=8.2.0",
+    "isort>=6.0.1",
+    "pandas>=2.3.0",
+]
+
+[project.scripts]
+tabula = "tabula:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
