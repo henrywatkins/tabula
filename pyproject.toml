@@ -8,10 +8,8 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "black>=25.1.0",
     "click>=8.2.0",
-    "isort>=6.0.1",
-    "pandas>=2.3.0",
+    "polars>=1.31.0",
 ]
 
 [project.scripts]
@@ -20,3 +18,10 @@ tabula = "tabula:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "pytest>=8.4.1",
+]

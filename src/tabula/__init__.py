@@ -1,199 +1,43 @@
 import re
 
 import click
-import pandas as pd
+import polars as pl
 
+VALID_METHODS = [
+    "select",
+    "upper",
+    "lower",
+    "length",
+    "where",
+    "head",
+    "tail",
+    "count",
+    "min",
+    "max",
+    "sum",
+    "join",
+    "uniq",
+    "uniqc",
+    "mean",
+    "median",
+    "mode",
+    "first",
+    "last",
+    "std",
+    "var",
+    "round",
+    "sortby",
+    "groupby",
+]
 
-class Query:
-    def __init__(self, df):
-        self.df = df.copy()
-
-    def select(self, *cols):
-        missing = [c for c in cols if c not in self.df.columns]
-        if missing:
-            raise ValueError(f"Columns not found: {missing}")
-        self.df = self.df[list(cols)]
-        return self
-
-    def upper(self, col):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        self.df[col] = self.df[col].str.upper()
-        return self
-
-    def lower(self, col):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        self.df[col] = self.df[col].str.lower()
-        return self
-
-    def length(self, col):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        self.df[col] = self.df[col].str.len()
-        return self
-
-    def where(self, condition):
-        try:
-            self.df = self.df.query(condition)
-        except Exception as e:
-            raise ValueError(f"Error in where: {e}")
-        return self
-
-    def head(self, n):
-        self.df = self.df.head(n)
-        return self
-
-    def tail(self, n):
-        self.df = self.df.tail(n)
-        return self
-
-    def count(self, col=None):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].count()
-        return len(self.df)
-
-    def min(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].min()
-        return self.df.min()
-
-    def max(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].max()
-        return self.df.max()
-
-    def sum(self, col=None):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].sum()
-        return self.df.sum()
-
-    def join(self, col, separator=","):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        return self.df[col].astype(str).str.cat(sep=separator)
-
-    def uniq(self, col):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        return self.df[col].unique().tolist()
-
-    def uniqc(self, col):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        value_counts = self.df[col].value_counts().to_dict()
-        return value_counts
-
-    def mean(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].mean()
-        return self.df.mean()
-
-    def median(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].median()
-        return self.df.median()
-
-    def mode(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].mode()[0] if not self.df[col].mode().empty else None
-        return self.df.mode()
-
-    def first(self, col=None):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].iloc[0] if not self.df.empty else None
-        return self.df.iloc[0] if not self.df.empty else None
-
-    def last(self, col=None):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].iloc[-1] if not self.df.empty else None
-        return self.df.iloc[-1] if not self.df.empty else None
-
-    def std(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].std()
-        return self.df.std()
-
-    def var(self, col):
-        if col:
-            if col not in self.df.columns:
-                raise ValueError(f"Column not found: {col}")
-            return self.df[col].var()
-        return self.df.var()
-
-    def round(self, col, decimals=0):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        self.df[col] = self.df[col].round(decimals)
-        return self
-
-    def sortby(self, col, ascending=True):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-        self.df = self.df.sort_values(by=col, ascending=ascending)
-        return self
-
-    def groupby(self, col, agg_func="count"):
-        if col not in self.df.columns:
-            raise ValueError(f"Column not found: {col}")
-
-        valid_aggs = ["count", "sum", "mean", "min", "max", "median"]
-        if agg_func not in valid_aggs:
-            raise ValueError(
-                f"Invalid aggregation function: {agg_func}. Valid options are: {valid_aggs}"
-            )
-
-        if agg_func == "count":
-            self.df = self.df.groupby(col).size().reset_index(name="count")
-        else:
-            # For other aggregations, we need to specify which columns to aggregate
-            # Here we aggregate all numeric columns
-            numeric_cols = self.df.select_dtypes(include=["number"]).columns
-            if len(numeric_cols) == 0:
-                raise ValueError(f"No numeric columns found for {agg_func} aggregation")
-
-            agg_dict = {col: agg_func for col in numeric_cols if col != col}
-            if agg_dict:
-                self.df = self.df.groupby(col).agg(agg_dict).reset_index()
-
-        return self
-
-    def result(self):
-        return self.df.to_csv(index=False)
 
 def validate_chain(expression):
     """Validates if the expression is of the form select(col1,col2).method1().method2()..."""
-    valid_methods = ['select', 'upper', 'lower', 'length', 'where', 'head', 'tail',
-                     'count', 'min', 'max', 'sum', 'join', 'uniq',
-                     'uniqc', 'mean', 'median', 'mode', 'first', 'last',
-                     'std', 'var', 'round', 'sortby', 'groupby'
-                     ]
-    
     # Check if expression is empty
     if not expression or not expression.strip():
         return False
     # Split by dot to get individual method calls
-    calls = expression.split('.')
+    calls = expression.split(".")
     # Check each method call
     for i, call in enumerate(calls):
         call = call.strip()
@@ -202,88 +46,144 @@ def validate_chain(expression):
             return False
         method = match.group(1)
         # Check if method is in valid methods list
-        if method not in valid_methods:
+        if method not in VALID_METHODS:
             return False
     return True
 
 
 def parse_chain(expression, df):
-    # Split the chain on dot, e.g. select(age,name).where(age>20).len(name)
-    if not validate_chain(expression):
-        raise ValueError("Invalid chain expression")
+    """Parse a chain of operations and apply them to the dataframe."""
+    # Split the expression by dots to get individual method calls
     calls = expression.split(".")
-    q = Query(df)
-    # Methods that return a value instead of self
-    terminal_methods = {
-        "count",
-        "min",
-        "max",
-        "sum",
-        "join",
-        "uniq",
-        "uniqc",
-        "mean",
-        "median",
-        "mode",
-        "first",
-        "last",
-        "std",
-        "var",
-    }
+    result = df
 
-    for i, call in enumerate(calls):
+    for call in calls:
         call = call.strip()
-        m = re.match(r"(\w+)\((.*?)\)$", call)
-        if not m:
-            raise ValueError(f"Invalid chain expression: {call}")
-        method, args_str = m.group(1), m.group(2).strip()
-
-        # Check if terminal method is used in the middle of the chain
-        if method in terminal_methods and i < len(calls) - 1:
-            raise ValueError(f"Method '{method}' must be the last call in the chain.")
-
+        match = re.match(r"(\w+)\((.*?)\)$", call)
+        if not match:
+            raise ValueError(f"Invalid method call format: {call}")
+        method, args_str = match.group(1), match.group(2)
         # Parse arguments
         args = []
+        kwargs = {}
         if args_str:
-            args = [arg.strip().strip("\"'") for arg in args_str.split(",")]
-        elif hasattr(q, method):
-            # Handle all other methods dynamically
-            result = getattr(q, method)(*args)
-            # If this is a terminal method, return its result
-            if method in terminal_methods:
-                return result
-            # Otherwise, result should be the updated query object
-            q = result
-        else:
-            raise ValueError(f"Unknown method: {method}")
+            # Split by commas, but ignore commas inside quotes
+            args_list = re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+', args_str)
+            for arg in args_list:
+                arg = arg.strip()
+                # Check if it's a keyword argument
+                if "=" in arg:
+                    key, value = arg.split("=", 1)
+                    kwargs[key.strip()] = eval(value.strip())  # Be careful with eval
+                else:
+                    # Handle quoted strings
+                    if (arg.startswith('"') and arg.endswith('"')) or (
+                        arg.startswith("'") and arg.endswith("'")
+                    ):
+                        args.append(arg[1:-1])  # Remove quotes
+                    else:
+                        try:
+                            # Try to convert to appropriate type
+                            args.append(eval(arg))
+                        except:
+                            args.append(arg)
 
-    # If we get here, we've processed all methods in the chain
-    return q.result()
+        # Apply the method based on its name
+        if method == "select":
+            result = result.select(pl.col(*args))
+        elif method == "upper":
+            result = result.with_columns(pl.col(*args).str.to_uppercase())
+        elif method == "lower":
+            result = result.with_columns(pl.col(*args).str.to_lowercase())
+        elif method == "length":
+            result = result.with_columns(
+                pl.col(*args).str.lengths().alias(f"{args[0]}_length")
+            )
+        elif method == "where":
+            # args[0] should be a filter expression
+            result = result.filter(eval(f"pl.col('{args[0]}') {args[1]} {args[2]}"))
+        elif method == "head":
+            n = args[0] if args else 5
+            result = result.head(n)
+        elif method == "tail":
+            n = args[0] if args else 5
+            result = result.tail(n)
+        elif method == "count":
+            result = result.select(pl.count())
+        elif method == "min":
+            result = result.select(pl.col(*args).min())
+        elif method == "max":
+            result = result.select(pl.col(*args).max())
+        elif method == "sum":
+            result = result.select(pl.col(*args).sum())
+        elif method == "join":
+            # Join requires another dataframe - this is simplified
+            other_df = args[0]
+            on = args[1] if len(args) > 1 else None
+            how = args[2] if len(args) > 2 else "inner"
+            result = result.join(other_df, on=on, how=how)
+        elif method == "uniq":
+            result = result.unique()
+        elif method == "uniqc":
+            result = result.group_by(*args).agg(pl.count())
+        elif method == "mean":
+            result = result.select(pl.col(*args).mean())
+        elif method == "median":
+            result = result.select(pl.col(*args).median())
+        elif method == "mode":
+            result = result.select(pl.col(*args).mode())
+        elif method == "first":
+            result = result.select(pl.col(*args).first())
+        elif method == "last":
+            result = result.select(pl.col(*args).last())
+        elif method == "std":
+            result = result.select(pl.col(*args).std())
+        elif method == "var":
+            result = result.select(pl.col(*args).var())
+        elif method == "round":
+            decimals = args[1] if len(args) > 1 else 0
+            result = result.with_columns(pl.col(args[0]).round(decimals))
+        elif method == "sortby":
+            descending = (
+                args[1] if len(args) > 1 and isinstance(args[1], bool) else False
+            )
+            result = result.sort(by=args[0], descending=descending)
+        elif method == "groupby":
+            # This typically needs an aggregation function
+            result = result.group_by(*args)
+
+    return result
 
 
 @click.command()
 @click.argument("expression")
 @click.argument("input_file", type=click.File("r"), default="-")
-@click.option("-F", "--delimiter", default=",", help="Delimiter for input file")
+@click.option("-F", "--separator", default=",", help="Delimiter for input file")
 @click.option(
-    "--no-headers", is_flag=True, help="Input file does not contain header names"
+    "--no-header", is_flag=True, help="Input file does not contain header names"
 )
-def main(expression, input_file, delimiter, no_headers):
+def main(expression, input_file, separator, no_header):
     """Process a CSV file with a chain of operations."""
-    if no_headers:
-        df = pd.read_csv(input_file, delimiter=delimiter, header=None)
-        df.rename(columns=lambda x: f"${x+1}", inplace=True)
+    if no_header:
+        df = pl.read_csv(input_file, separator=separator, has_header=False)
     else:
-        df = pd.read_csv(input_file, delimiter=delimiter)
-    if df.empty:
-        click.echo("Input file is empty or not formatted correctly.", err=True)
+        df = pl.read_csv(input_file, separator=separator)
+    #if df.is_empty():
+    #    click.echo("Input file is empty or not formatted correctly.", err=True)
+    #    return
+    # Validate and parse the expression
+    if not validate_chain(expression):
+        click.echo(
+            "Invalid expression format. Please use the correct syntax.", err=True
+        )
         return
+
     try:
         result = parse_chain(expression, df)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         return
-    click.echo(result)
+    click.echo(result.collect())
 
 
 if __name__ == "__main__":
