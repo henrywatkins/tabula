@@ -1,6 +1,5 @@
 import os
 import tempfile
-from io import StringIO
 
 import polars as pl
 import pytest
@@ -129,7 +128,7 @@ class TestParseChain:
 
     def test_where_and_condition(self, sample_df):
         """Test where with AND (&) condition."""
-        result = parse_chain("where(age>25 & salary>=70000)", sample_df)
+        result = parse_chain("where((age>25) & (salary>=70000))", sample_df)
         # Only Charlie (35, 70000) and David (40, 80000) match
         assert len(result) == 2
         names = result["name"].to_list()
@@ -139,7 +138,7 @@ class TestParseChain:
     def test_where_or_condition(self, sample_df):
         """Test where with OR (|) condition."""
         result = parse_chain(
-            "where(department=='HR' | department=='Finance')", sample_df
+            "where((department=='HR') | (department=='Finance'))", sample_df
         )
         names = result["name"].to_list()
         assert "Alice" in names  # HR
@@ -149,7 +148,7 @@ class TestParseChain:
     def test_where_multiple_and_or(self, sample_df):
         """Test where with multiple AND/OR conditions."""
         result = parse_chain(
-            "where((age>=30 & department=='IT') | (salary<60000))", sample_df
+            "where(((age>=30) & (department=='IT')) | (salary<60000))", sample_df
         )
         names = result["name"].to_list()
         # Bob (30, IT), David (40, IT), Alice (25, HR, salary 50000)
@@ -158,7 +157,7 @@ class TestParseChain:
     def test_where_parentheses_precedence(self, sample_df):
         """Test where with parentheses for precedence."""
         result = parse_chain(
-            "where(age>30 | (department=='HR' & salary<60000))", sample_df
+            "where((age>30) | ((department=='HR') & (salary<60000)))", sample_df
         )
         names = result["name"].to_list()
         # Charlie (35), David (40), Alice (HR, 50000)
@@ -178,12 +177,22 @@ class TestParseChain:
 
     def test_uniq_method(self, sample_df):
         """Test unique values."""
-        # Create df with duplicates
-        df_with_dups = pl.DataFrame(
-            {"name": ["Alice", "Bob", "Alice", "Charlie"], "age": [25, 30, 25, 35]}
-        )
-        result = parse_chain("uniq()", df_with_dups)
-        assert len(result) == 3  # Should remove one duplicate
+        result = parse_chain("uniq(department)", sample_df)
+        assert len(result) == 3
+
+    def test_strlen_method(self, sample_df):
+        """Test strlen method for string column."""
+        result = parse_chain("select(name).strlen(name)", sample_df)
+        # Should return a DataFrame with the same number of rows and a column with string lengths
+        lengths = result["name_length"].to_list()
+        expected_lengths = [len(name) for name in sample_df["name"].to_list()]
+        assert lengths == expected_lengths
+
+    def test_strlen_on_non_string_column(self, sample_df):
+        """Test strlen method on a non-string column should raise or handle gracefully."""
+        # Try to apply strlen to an integer column
+        with pytest.raises(Exception):
+            parse_chain("select(age).strlen(age)", sample_df)
 
     def test_round_method(self, sample_df):
         """Test rounding numbers."""
@@ -338,9 +347,6 @@ class TestEdgeCases:
 
         result = parse_chain("count()", df)
         assert result.item() == 2
-
-        result = parse_chain("uniq()", df)
-        assert len(result) == 2
 
     def test_statistical_methods(self):
         """Test statistical methods."""

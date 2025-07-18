@@ -17,6 +17,7 @@ VALID_METHODS = [
     "max",
     "sum",
     "strjoin",
+    "strlen",  # Alias for length
     "uniq",
     "uniqc",
     "mean",
@@ -93,10 +94,65 @@ def parse_arguments(args_str):
                     args.append(arg)
     return args
 
+
+def find_replace_variables(text, replacement_func):
+    """
+    Find and replace variable names in expressions while avoiding single-quoted strings.
+
+    Args:
+        text: The input text containing expressions
+        replacement_func: Function that takes a variable name and returns its replacement
+
+    Returns:
+        Text with variables replaced according to replacement_func
+    """
+    # Pattern explanation:
+    # (?:'[^']*'|"[^"]*")  - Match single or double quoted strings (to skip them)
+    # |                    - OR
+    # \b([a-zA-Z_][a-zA-Z0-9_]*)\b  - Match word boundaries around identifiers
+
+    pattern = r"(?:'[^']*'|\"[^\"]*\")|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)"
+
+    def replace_match(match):
+        # If the match is a quoted string (group 1 is None), return it unchanged
+        if match.group(1) is None:
+            return match.group(0)
+
+        # Otherwise, it's a variable name - apply the replacement function
+        variable_name = match.group(1)
+        return replacement_func(variable_name)
+
+    return re.sub(pattern, replace_match, text)
+
+
+def extract_variables(text: str) -> set[str]:
+    """
+    Extract all variable names from an expression, excluding quoted strings.
+
+    Args:
+        text: The input text containing expressions
+
+    Returns:
+        Set of variable names found in the text
+    """
+    variables = set()
+
+    def collect_variable(var_name: str) -> str:
+        variables.add(var_name)
+        return var_name
+
+    find_replace_variables(text, collect_variable)
+    return variables
+
+
+def polars_wrapper(var_name: str) -> str:
+    return f"pl.col('{var_name}')"
+
+
 def convert_to_polars_expr(expr):
     """Convert a string expression to a Polars expression."""
-    pass
-
+    replaced = find_replace_variables(expr, polars_wrapper)
+    return eval(replaced)
 
 
 def apply_method(method, args, df):
@@ -107,8 +163,8 @@ def apply_method(method, args, df):
         return df.with_columns(pl.col(*args).str.to_uppercase())
     elif method == "lower":
         return df.with_columns(pl.col(*args).str.to_lowercase())
-    elif method == "length":
-        return df.with_columns(pl.col(*args).str.lengths().alias(f"{args[0]}_length"))
+    elif method == "strlen":
+        return df.with_columns(pl.col(*args).str.len_chars().alias(f"{args[0]}_length"))
     elif method == "where":
         polars_expr = convert_to_polars_expr(args[0])
         return df.filter(polars_expr)
@@ -132,7 +188,8 @@ def apply_method(method, args, df):
         separator = args[1] if len(args) > 1 else ""
         return df.select(pl.col(args[0]).str.join(separator).alias(f"{args[0]}_joined"))
     elif method == "uniq":
-        return df.unique()
+        # Return unique values from the specified column
+        return df.select(pl.col(args[0]).unique())
     elif method == "uniqc":
         return df.group_by(*args).agg(pl.count())
     elif method == "mean":
@@ -184,9 +241,16 @@ def parse_chain(expression, df):
     help="Type of input file: csv or tsv",
 )
 @click.option(
+    "-o",
+    "--outtype",
+    type=click.Choice(["polars", "csv", "tsv"], case_sensitive=False),
+    default="polars",
+    help="Type of input file: polars, csv or tsv",
+)
+@click.option(
     "--no-header", is_flag=True, help="Input file does not contain header names"
 )
-def main(expression, input_file, type, no_header):
+def main(expression, input_file, type, no_header, outtype):
     """Process a CSV or TSV file with a chain of operations."""
     content = input_file.read()
     buffer = StringIO(content)
@@ -208,7 +272,14 @@ def main(expression, input_file, type, no_header):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         return
-    click.echo(result)
+    if outtype.lower() == "polars":
+        click.echo(result)
+    elif outtype.lower() == "tsv":
+        separator = "\t"
+        click.echo(result.write_csv(separator=separator))
+    else:  # Default to CSV
+        separator = ","
+        click.echo(result.write_csv(separator=separator))
 
 
 if __name__ == "__main__":
