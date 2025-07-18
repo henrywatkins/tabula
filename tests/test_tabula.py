@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 from click.testing import CliRunner
 
-from tabula import VALID_METHODS, main, parse_chain, validate_chain
+from tabula_cli import VALID_METHODS, main, parse_chain, validate_chain
 
 
 class TestValidateChain:

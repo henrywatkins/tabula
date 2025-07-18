@@ -1,5 +1,5 @@
 [project]
-name = "tabula"
+name = "tabula-cli"
 version = "1.0.0"
 description = "Tabular manipulation on the command line"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tabula = "tabula:main"
+tabula = "tabula_cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -175,8 +175,8 @@ wheels = [
 ]
 
 [[package]]
-name = "tabula"
-version = "0.1.0"
+name = "tabula-cli"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
