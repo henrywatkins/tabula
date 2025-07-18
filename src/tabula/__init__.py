@@ -181,11 +181,56 @@ class Query:
     def result(self):
         return self.df.to_csv(index=False)
 
+def validate_chain(expression):
+    """Validates if the expression is of the form select(col1,col2).method1().method2()..."""
+    valid_methods = ['select', 'upper', 'lower', 'length', 'where', 'head', 'tail',
+                     'count', 'min', 'max', 'sum', 'join', 'uniq',
+                     'uniqc', 'mean', 'median', 'mode', 'first', 'last',
+                     'std', 'var', 'round', 'sortby', 'groupby'
+                     ]
+    
+    # Check if expression is empty
+    if not expression or not expression.strip():
+        return False
+    # Split by dot to get individual method calls
+    calls = expression.split('.')
+    # Check each method call
+    for i, call in enumerate(calls):
+        call = call.strip()
+        match = re.match(r"(\w+)\((.*?)\)$", call)
+        if not match:
+            return False
+        method = match.group(1)
+        # Check if method is in valid methods list
+        if method not in valid_methods:
+            return False
+    return True
+
 
 def parse_chain(expression, df):
     # Split the chain on dot, e.g. select(age,name).where(age>20).len(name)
+    if not validate_chain(expression):
+        raise ValueError("Invalid chain expression")
     calls = expression.split(".")
     q = Query(df)
+    # Methods that return a value instead of self
+    terminal_methods = {
+        "count",
+        "min",
+        "max",
+        "sum",
+        "join",
+        "uniq",
+        "uniqc",
+        "mean",
+        "median",
+        "mode",
+        "first",
+        "last",
+        "std",
+        "var",
+    }
+
     for i, call in enumerate(calls):
         call = call.strip()
         m = re.match(r"(\w+)\((.*?)\)$", call)
@@ -193,74 +238,46 @@ def parse_chain(expression, df):
             raise ValueError(f"Invalid chain expression: {call}")
         method, args_str = m.group(1), m.group(2).strip()
 
-        def parse_chain(expression, df):
-            # Split the chain on dot, e.g. select(age,name).where(age>20).len(name)
-            calls = expression.split(".")
-            q = Query(df)
+        # Check if terminal method is used in the middle of the chain
+        if method in terminal_methods and i < len(calls) - 1:
+            raise ValueError(f"Method '{method}' must be the last call in the chain.")
 
-            # Methods that return a value instead of self
-            terminal_methods = {
-                "count",
-                "min",
-                "max",
-                "sum",
-                "join",
-                "uniq",
-                "uniqc",
-                "mean",
-                "median",
-                "mode",
-                "first",
-                "last",
-                "std",
-                "var",
-            }
+        # Parse arguments
+        args = []
+        if args_str:
+            args = [arg.strip().strip("\"'") for arg in args_str.split(",")]
+        elif hasattr(q, method):
+            # Handle all other methods dynamically
+            result = getattr(q, method)(*args)
+            # If this is a terminal method, return its result
+            if method in terminal_methods:
+                return result
+            # Otherwise, result should be the updated query object
+            q = result
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
-            for i, call in enumerate(calls):
-                call = call.strip()
-                m = re.match(r"(\w+)\((.*?)\)$", call)
-                if not m:
-                    raise ValueError(f"Invalid chain expression: {call}")
-                method, args_str = m.group(1), m.group(2).strip()
-
-                # Check if terminal method is used in the middle of the chain
-                if method in terminal_methods and i < len(calls) - 1:
-                    raise ValueError(
-                        f"Method '{method}' must be the last call in the chain."
-                    )
-
-                # Parse arguments
-                args = []
-                if args_str:
-                    args = [arg.strip().strip("\"'") for arg in args_str.split(",")]
-                elif hasattr(q, method):
-                    # Handle all other methods dynamically
-                    result = getattr(q, method)(*args)
-                    # If this is a terminal method, return its result
-                    if method in terminal_methods:
-                        return result
-                    # Otherwise, result should be the updated query object
-                    q = result
-                else:
-                    raise ValueError(f"Unknown method: {method}")
-
-            # If we get here, we've processed all methods in the chain
-            return q.result()
+    # If we get here, we've processed all methods in the chain
+    return q.result()
 
 
 @click.command()
 @click.argument("expression")
 @click.argument("input_file", type=click.File("r"), default="-")
 @click.option("-F", "--delimiter", default=",", help="Delimiter for input file")
-def main(expression, input_file, delimiter):
-    """Process INPUT_FILE with EXPRESSION and write to stdout. Use '-' for stdin."""
-    # Read data from input using pandas
-    df = pd.read_csv(input_file, delimiter=delimiter)
+@click.option(
+    "--no-headers", is_flag=True, help="Input file does not contain header names"
+)
+def main(expression, input_file, delimiter, no_headers):
+    """Process a CSV file with a chain of operations."""
+    if no_headers:
+        df = pd.read_csv(input_file, delimiter=delimiter, header=None)
+        df.rename(columns=lambda x: f"${x+1}", inplace=True)
+    else:
+        df = pd.read_csv(input_file, delimiter=delimiter)
     if df.empty:
         click.echo("Input file is empty or not formatted correctly.", err=True)
         return
-
-    # If the expression contains a dot, assume it is a chain of methods.
     try:
         result = parse_chain(expression, df)
     except Exception as e:
