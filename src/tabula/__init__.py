@@ -1,5 +1,5 @@
 import re
-
+from io import StringIO
 import click
 import polars as pl
 
@@ -168,10 +168,7 @@ def main(expression, input_file, separator, no_header):
         df = pl.read_csv(input_file, separator=separator, has_header=False)
     else:
         df = pl.read_csv(input_file, separator=separator)
-    #if df.is_empty():
-    #    click.echo("Input file is empty or not formatted correctly.", err=True)
-    #    return
-    # Validate and parse the expression
+
     if not validate_chain(expression):
         click.echo(
             "Invalid expression format. Please use the correct syntax.", err=True
@@ -183,7 +180,7 @@ def main(expression, input_file, separator, no_header):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         return
-    click.echo(result.collect())
+    click.echo(result)
 
 
 if __name__ == "__main__":
