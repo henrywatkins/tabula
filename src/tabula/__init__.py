@@ -1,5 +1,6 @@
 import re
 from io import StringIO
+
 import click
 import polars as pl
 
@@ -27,7 +28,6 @@ VALID_METHODS = [
     "var",
     "round",
     "sortby",
-    "groupby",
     "columns",
 ]
 TERMINAL_METHODS = [
@@ -46,6 +46,7 @@ TERMINAL_METHODS = [
     "std",
     "var",
 ]
+
 
 def validate_chain(expression):
     """Validates if the expression is of the form select(col1,col2).method1().method2()..."""
@@ -69,107 +70,105 @@ def validate_chain(expression):
     return True
 
 
+def parse_arguments(args_str):
+    """Parse argument string into args."""
+    args = []
+    if args_str:
+        # Split by commas, but ignore commas inside single or double quotes
+        args_list = re.findall(
+            r"""((?:(?:"(?:\\.|[^"])*")|(?:'(?:\\.|[^'])*')|[^,'"])+)""", args_str
+        )
+        args_list = [arg for arg in (a.strip() for a in args_list) if arg]
+
+        for arg in args_list:
+            arg = arg.strip()
+            if (arg.startswith('"') and arg.endswith('"')) or (
+                arg.startswith("'") and arg.endswith("'")
+            ):
+                args.append(arg[1:-1])
+            else:
+                try:
+                    args.append(eval(arg))
+                except Exception:
+                    args.append(arg)
+    return args
+
+def convert_to_polars_expr(expr):
+    """Convert a string expression to a Polars expression."""
+    pass
+
+
+
+def apply_method(method, args, df):
+    """Apply a single method to the dataframe."""
+    if method == "select":
+        return df.select(pl.col(*args))
+    elif method == "upper":
+        return df.with_columns(pl.col(*args).str.to_uppercase())
+    elif method == "lower":
+        return df.with_columns(pl.col(*args).str.to_lowercase())
+    elif method == "length":
+        return df.with_columns(pl.col(*args).str.lengths().alias(f"{args[0]}_length"))
+    elif method == "where":
+        polars_expr = convert_to_polars_expr(args[0])
+        return df.filter(polars_expr)
+    elif method == "head":
+        n = args[0] if args else 5
+        return df.head(n)
+    elif method == "tail":
+        n = args[0] if args else 5
+        return df.tail(n)
+    elif method == "count":
+        return df.select(pl.count())
+    elif method == "columns":
+        return df.columns
+    elif method == "min":
+        return df.select(pl.col(*args).min())
+    elif method == "max":
+        return df.select(pl.col(*args).max())
+    elif method == "sum":
+        return df.select(pl.col(*args).sum())
+    elif method == "strjoin":
+        separator = args[1] if len(args) > 1 else ""
+        return df.select(pl.col(args[0]).str.join(separator).alias(f"{args[0]}_joined"))
+    elif method == "uniq":
+        return df.unique()
+    elif method == "uniqc":
+        return df.group_by(*args).agg(pl.count())
+    elif method == "mean":
+        return df.select(pl.col(*args).mean())
+    elif method == "median":
+        return df.select(pl.col(*args).median())
+    elif method == "mode":
+        return df.select(pl.col(*args).mode())
+    elif method == "first":
+        return df.select(pl.col(*args).first())
+    elif method == "last":
+        return df.select(pl.col(*args).last())
+    elif method == "std":
+        return df.select(pl.col(*args).std())
+    elif method == "var":
+        return df.select(pl.col(*args).var())
+    elif method == "round":
+        decimals = args[1] if len(args) > 1 else 0
+        return df.with_columns(pl.col(args[0]).round(decimals))
+    elif method == "sortby":
+        descending = args[1] if len(args) > 1 and isinstance(args[1], bool) else False
+        return df.sort(by=args[0], descending=descending)
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
+
 def parse_chain(expression, df):
     """Parse a chain of operations and apply them to the dataframe."""
-    # Split the expression by dots to get individual method calls
     calls = expression.split(".")
     result = df
-
     for call in calls:
         call = call.strip()
         match = re.match(r"(\w+)\((.*?)\)$", call)
         method, args_str = match.group(1), match.group(2)
-        # Parse arguments
-        args = []
-        kwargs = {}
-        if args_str:
-            # Split by commas, but ignore commas inside quotes
-            args_list = re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+', args_str)
-            for arg in args_list:
-                arg = arg.strip()
-                # Check if it's a keyword argument
-                if "=" in arg:
-                    key, value = arg.split("=", 1)
-                    kwargs[key.strip()] = eval(value.strip())  # Be careful with eval
-                else:
-                    # Handle quoted strings
-                    if (arg.startswith('"') and arg.endswith('"')) or (
-                        arg.startswith("'") and arg.endswith("'")
-                    ):
-                        args.append(arg[1:-1])  # Remove quotes
-                    else:
-                        try:
-                            # Try to convert to appropriate type
-                            args.append(eval(arg))
-                        except:
-                            args.append(arg)
-
-        # Apply the method based on its name
-        if method == "select":
-            result = result.select(pl.col(*args))
-        elif method == "upper":
-            result = result.with_columns(pl.col(*args).str.to_uppercase())
-        elif method == "lower":
-            result = result.with_columns(pl.col(*args).str.to_lowercase())
-        elif method == "length":
-            result = result.with_columns(
-                pl.col(*args).str.lengths().alias(f"{args[0]}_length")
-            )
-        elif method == "where":
-            # args[0] should be a filter expression
-            result = result.filter(eval(f"pl.col('{args[0]}') {args[1]} {args[2]}"))
-        elif method == "head":
-            n = args[0] if args else 5
-            result = result.head(n)
-        elif method == "tail":
-            n = args[0] if args else 5
-            result = result.tail(n)
-        elif method == "count":
-            result = result.select(pl.count())
-        elif method == "columns":
-            # Return the column names
-            result = result.columns
-        elif method == "min":
-            result = result.select(pl.col(*args).min())
-        elif method == "max":
-            result = result.select(pl.col(*args).max())
-        elif method == "sum":
-            result = result.select(pl.col(*args).sum())
-        elif method == "strjoin":
-            # string join operation
-            separator = args[1] if len(args) > 1 else ","
-            result = result.with_columns(
-                pl.col(args[0]).str.join(separator).alias(f"{args[0]}_joined")
-            )
-        elif method == "uniq":
-            result = result.unique()
-        elif method == "uniqc":
-            result = result.group_by(*args).agg(pl.count())
-        elif method == "mean":
-            result = result.select(pl.col(*args).mean())
-        elif method == "median":
-            result = result.select(pl.col(*args).median())
-        elif method == "mode":
-            result = result.select(pl.col(*args).mode())
-        elif method == "first":
-            result = result.select(pl.col(*args).first())
-        elif method == "last":
-            result = result.select(pl.col(*args).last())
-        elif method == "std":
-            result = result.select(pl.col(*args).std())
-        elif method == "var":
-            result = result.select(pl.col(*args).var())
-        elif method == "round":
-            decimals = args[1] if len(args) > 1 else 0
-            result = result.with_columns(pl.col(args[0]).round(decimals))
-        elif method == "sortby":
-            descending = (
-                args[1] if len(args) > 1 and isinstance(args[1], bool) else False
-            )
-            result = result.sort(by=args[0], descending=descending)
-        elif method == "groupby":
-            # This typically needs an aggregation function
-            result = result.group_by(*args)
+        args = parse_arguments(args_str)
+        result = apply_method(method, args, result)
 
     return result
 
@@ -200,7 +199,7 @@ def main(expression, input_file, type, no_header):
 
     if not validate_chain(expression):
         click.echo(
-            "Invalid expression format. Please use the correct syntax.", err=True
+            "Invalid expression format. Double check expression syntax.", err=True
         )
         return
 
