@@ -245,13 +245,44 @@ def parse_chain(expression, df):
     "--outtype",
     type=click.Choice(["polars", "csv", "tsv"], case_sensitive=False),
     default="polars",
-    help="Type of input file: polars, csv or tsv",
+    help="Type of output format: polars, csv or tsv",
 )
 @click.option(
-    "--no-header", is_flag=True, help="Input file does not contain header names"
+    "--no-header", is_flag=True, help="If the input file does not contain header names"
 )
 def main(expression, input_file, type, no_header, outtype):
-    """Process a CSV or TSV file with a chain of operations."""
+    """Process a CSV or TSV file with a chain of operations.
+
+    EXPRESSION is a chain of operations like select(col1,col2).method1().method2()...
+    
+    \b
+    Available methods:
+    select(col1, col2, ...) - Select specific columns from the dataframe.
+    upper(col) - Convert the specified column to uppercase.
+    lower(col) - Convert the specified column to lowercase.
+    strlen(col) - Get the length of the specified column's strings.
+    where(condition) - Filter rows based on a condition.
+    head(n) - Get the first n rows of the dataframe.
+    tail(n) - Get the last n rows of the dataframe.
+    count() - Count the number of rows in the dataframe.
+    columns() - Get the list of column names in the dataframe.
+    min(col) - Get the minimum value of the specified column.
+    max(col) - Get the maximum value of the specified column.
+    sum(col) - Get the sum of the specified column.
+    strjoin(col, separator) - Join strings in the specified column with a separator.
+    uniq(col) - Get unique values from the specified column.
+    uniqc(col) - Count unique values in the specified column.
+    mean(col) - Calculate the mean of the specified column.
+    median(col) - Calculate the median of the specified column.
+    mode(col) - Calculate the mode of the specified column.
+    first(col) - Get the first value of the specified column.
+    last(col) - Get the last value of the specified column.
+    std(col) - Calculate the standard deviation of the specified column.
+    var(col) - Calculate the variance of the specified column.
+    round(col, decimals) - Round the specified column to a given number of decimal places.
+    sortby(col, False) - Sort the dataframe by the specified column in ascending (False).
+    """
+
     content = input_file.read()
     buffer = StringIO(content)
     separator = "," if type.lower() == "csv" else "\t"
