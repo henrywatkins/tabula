@@ -1,11 +1,12 @@
 [project]
 name = "tabula"
-version = "0.1.0"
+version = "1.0.0"
 description = "Tabular manipulation on the command line"
 readme = "README.md"
 authors = [
     { name = "henrywatkins", email = "h.watkins@hotmail.com" }
 ]
+license = { file = "LICENSE"}
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.0",
