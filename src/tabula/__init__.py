@@ -15,7 +15,7 @@ VALID_METHODS = [
     "min",
     "max",
     "sum",
-    "join",
+    "strjoin",
     "uniq",
     "uniqc",
     "mean",
@@ -28,8 +28,24 @@ VALID_METHODS = [
     "round",
     "sortby",
     "groupby",
+    "columns",
 ]
-
+TERMINAL_METHODS = [
+    "count",
+    "columns",
+    "min",
+    "strjoin",
+    "max",
+    "sum",
+    "uniq",
+    "mean",
+    "median",
+    "mode",
+    "first",
+    "last",
+    "std",
+    "var",
+]
 
 def validate_chain(expression):
     """Validates if the expression is of the form select(col1,col2).method1().method2()..."""
@@ -38,7 +54,6 @@ def validate_chain(expression):
         return False
     # Split by dot to get individual method calls
     calls = expression.split(".")
-    # Check each method call
     for i, call in enumerate(calls):
         call = call.strip()
         match = re.match(r"(\w+)\((.*?)\)$", call)
@@ -47,6 +62,9 @@ def validate_chain(expression):
         method = match.group(1)
         # Check if method is in valid methods list
         if method not in VALID_METHODS:
+            return False
+        # If a terminal method is found, it must be the last in the chain
+        if method in TERMINAL_METHODS and i != len(calls) - 1:
             return False
     return True
 
@@ -60,8 +78,6 @@ def parse_chain(expression, df):
     for call in calls:
         call = call.strip()
         match = re.match(r"(\w+)\((.*?)\)$", call)
-        if not match:
-            raise ValueError(f"Invalid method call format: {call}")
         method, args_str = match.group(1), match.group(2)
         # Parse arguments
         args = []
@@ -110,18 +126,21 @@ def parse_chain(expression, df):
             result = result.tail(n)
         elif method == "count":
             result = result.select(pl.count())
+        elif method == "columns":
+            # Return the column names
+            result = result.columns
         elif method == "min":
             result = result.select(pl.col(*args).min())
         elif method == "max":
             result = result.select(pl.col(*args).max())
         elif method == "sum":
             result = result.select(pl.col(*args).sum())
-        elif method == "join":
-            # Join requires another dataframe - this is simplified
-            other_df = args[0]
-            on = args[1] if len(args) > 1 else None
-            how = args[2] if len(args) > 2 else "inner"
-            result = result.join(other_df, on=on, how=how)
+        elif method == "strjoin":
+            # string join operation
+            separator = args[1] if len(args) > 1 else ","
+            result = result.with_columns(
+                pl.col(args[0]).str.join(separator).alias(f"{args[0]}_joined")
+            )
         elif method == "uniq":
             result = result.unique()
         elif method == "uniqc":
@@ -158,16 +177,26 @@ def parse_chain(expression, df):
 @click.command()
 @click.argument("expression")
 @click.argument("input_file", type=click.File("r"), default="-")
-@click.option("-F", "--separator", default=",", help="Delimiter for input file")
+@click.option(
+    "-t",
+    "--type",
+    type=click.Choice(["csv", "tsv"], case_sensitive=False),
+    default="csv",
+    help="Type of input file: csv or tsv",
+)
 @click.option(
     "--no-header", is_flag=True, help="Input file does not contain header names"
 )
-def main(expression, input_file, separator, no_header):
-    """Process a CSV file with a chain of operations."""
-    if no_header:
-        df = pl.read_csv(input_file, separator=separator, has_header=False)
-    else:
-        df = pl.read_csv(input_file, separator=separator)
+def main(expression, input_file, type, no_header):
+    """Process a CSV or TSV file with a chain of operations."""
+    content = input_file.read()
+    buffer = StringIO(content)
+    separator = "," if type.lower() == "csv" else "\t"
+    try:
+        df = pl.read_csv(buffer, separator=separator, has_header=not no_header)
+    except pl.exceptions.NoDataError:
+        click.echo("Input file is empty or contains no data.", err=True)
+        return
 
     if not validate_chain(expression):
         click.echo(

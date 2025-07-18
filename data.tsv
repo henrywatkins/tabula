@@ -1,0 +1,11 @@
+name	age	department	salary	years_experience	city	is_manager
+Alice Johnson	28	Engineering	75000	3.5	New York	False
+Bob Smith	35	Marketing	65000	8.2	San Francisco	True
+Carol Davis	42	Engineering	95000	12.0	Seattle	True
+David Wilson	29	Sales	55000	2.1	Chicago	False
+Eve Brown	31	HR	60000	5.5	Boston	False
+Frank Miller	38	Engineering	85000	10.3	Austin	True
+Grace Lee	26	Marketing	52000	1.8	Denver	False
+Henry Garcia	45	Sales	70000	15.2	Miami	True
+Ivy Chen	33	Engineering	80000	6.7	Portland	False
+Jack Taylor	37	HR	68000	9.1	Phoenix	True

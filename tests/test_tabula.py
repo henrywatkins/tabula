@@ -88,6 +88,11 @@ class TestParseChain:
         """Test count method."""
         result = parse_chain("count()", sample_df)
         assert result.item() == 4
+    
+    def test_strjoin_method(self, sample_df):
+        """Test string join method."""
+        result = parse_chain("select(name).strjoin(name, ', ')", sample_df)
+        assert result.item() == "Alice, Bob, Charlie, David"
         
     def test_string_methods(self, sample_df):
         """Test string transformation methods."""
@@ -129,7 +134,7 @@ class TestParseChain:
         """Test groupby."""
         result = parse_chain("groupby(department)", sample_df)
         # GroupBy returns a grouped dataframe
-        assert isinstance(result, pl.LazyGroupBy)
+        assert isinstance(result, pl.GroupBy)
         
     def test_uniq_method(self, sample_df):
         """Test unique values."""
@@ -143,7 +148,7 @@ class TestParseChain:
         
     def test_invalid_method_call(self, sample_df):
         """Test invalid method calls raise errors."""
-        with pytest.raises(ValueError, match="Invalid method call format"):
+        with pytest.raises(ValueError, match="Invalid expression format. Please use the correct syntax."):
             parse_chain("select", sample_df)
             
     def test_round_method(self, sample_df):
@@ -199,23 +204,6 @@ class TestCLI:
         finally:
             os.unlink(temp_file)
     
-    def test_cli_with_custom_separator(self):
-        """Test CLI with custom separator."""
-        runner = CliRunner()
-        
-        csv_content = "name;age;salary\nAlice;25;50000\nBob;30;60000\n"
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-            f.write(csv_content)
-            temp_file = f.name
-        
-        try:
-            result = runner.invoke(main, ['select(name)', temp_file, '-F', ';'])
-            assert result.exit_code == 0
-            assert "Alice" in result.output
-            assert "Bob" in result.output
-        finally:
-            os.unlink(temp_file)
     
     def test_cli_no_header_option(self):
         """Test CLI with no-header option."""
