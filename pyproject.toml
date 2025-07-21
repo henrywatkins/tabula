@@ -18,6 +18,8 @@ dependencies = [
 
 [project.scripts]
 tabula = "tabula_cli:main"
+tabula-plot = "tabula_cli:plotx"
+tabula-stats = "tabula_cli:statx"
 
 [build-system]
 requires = ["hatchling"]

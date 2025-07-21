@@ -1,10 +1,10 @@
 from io import StringIO
+
+import matplotlib.pyplot as plt
+import pandas as pd
 import pytest
 from click.testing import CliRunner
-import pandas as pd
-import matplotlib.pyplot as plt
-
-from gullplot.cli import gull, parse_script, parse_columns
+from gullplot.cli import gull, parse_columns, parse_script
 
 
 @pytest.fixture

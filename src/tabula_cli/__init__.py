@@ -1,233 +1,14 @@
-import re
 from io import StringIO
+from typing import Any, Callable, Dict, List, Optional, TextIO, Tuple
 
 import click
+import matplotlib.pyplot as plt
+import pandas as pd
 import polars as pl
 
-VALID_METHODS = [
-    "select",
-    "upper",
-    "lower",
-    "length",
-    "where",
-    "head",
-    "tail",
-    "count",
-    "min",
-    "max",
-    "sum",
-    "strjoin",
-    "strlen",  # Alias for length
-    "uniq",
-    "uniqc",
-    "mean",
-    "median",
-    "mode",
-    "first",
-    "last",
-    "std",
-    "var",
-    "round",
-    "sortby",
-    "columns",
-]
-TERMINAL_METHODS = [
-    "count",
-    "columns",
-    "min",
-    "strjoin",
-    "max",
-    "sum",
-    "uniq",
-    "mean",
-    "median",
-    "mode",
-    "first",
-    "last",
-    "std",
-    "var",
-]
-
-
-def validate_chain(expression):
-    """Validates if the expression is of the form select(col1,col2).method1().method2()..."""
-    # Check if expression is empty
-    if not expression or not expression.strip():
-        return False
-    # Split by dot to get individual method calls
-    calls = expression.split(".")
-    for i, call in enumerate(calls):
-        call = call.strip()
-        match = re.match(r"(\w+)\((.*?)\)$", call)
-        if not match:
-            return False
-        method = match.group(1)
-        # Check if method is in valid methods list
-        if method not in VALID_METHODS:
-            return False
-        # If a terminal method is found, it must be the last in the chain
-        if method in TERMINAL_METHODS and i != len(calls) - 1:
-            return False
-    return True
-
-
-def parse_arguments(args_str):
-    """Parse argument string into args."""
-    args = []
-    if args_str:
-        # Split by commas, but ignore commas inside single or double quotes
-        args_list = re.findall(
-            r"""((?:(?:"(?:\\.|[^"])*")|(?:'(?:\\.|[^'])*')|[^,'"])+)""", args_str
-        )
-        args_list = [arg for arg in (a.strip() for a in args_list) if arg]
-
-        for arg in args_list:
-            arg = arg.strip()
-            if (arg.startswith('"') and arg.endswith('"')) or (
-                arg.startswith("'") and arg.endswith("'")
-            ):
-                args.append(arg[1:-1])
-            else:
-                try:
-                    args.append(eval(arg))
-                except Exception:
-                    args.append(arg)
-    return args
-
-
-def find_replace_variables(text, replacement_func):
-    """
-    Find and replace variable names in expressions while avoiding single-quoted strings.
-
-    Args:
-        text: The input text containing expressions
-        replacement_func: Function that takes a variable name and returns its replacement
-
-    Returns:
-        Text with variables replaced according to replacement_func
-    """
-    # Pattern explanation:
-    # (?:'[^']*'|"[^"]*")  - Match single or double quoted strings (to skip them)
-    # |                    - OR
-    # \b([a-zA-Z_][a-zA-Z0-9_]*)\b  - Match word boundaries around identifiers
-
-    pattern = r"(?:'[^']*'|\"[^\"]*\")|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)"
-
-    def replace_match(match):
-        # If the match is a quoted string (group 1 is None), return it unchanged
-        if match.group(1) is None:
-            return match.group(0)
-
-        # Otherwise, it's a variable name - apply the replacement function
-        variable_name = match.group(1)
-        return replacement_func(variable_name)
-
-    return re.sub(pattern, replace_match, text)
-
-
-def extract_variables(text: str) -> set[str]:
-    """
-    Extract all variable names from an expression, excluding quoted strings.
-
-    Args:
-        text: The input text containing expressions
-
-    Returns:
-        Set of variable names found in the text
-    """
-    variables = set()
-
-    def collect_variable(var_name: str) -> str:
-        variables.add(var_name)
-        return var_name
-
-    find_replace_variables(text, collect_variable)
-    return variables
-
-
-def polars_wrapper(var_name: str) -> str:
-    return f"pl.col('{var_name}')"
-
-
-def convert_to_polars_expr(expr):
-    """Convert a string expression to a Polars expression."""
-    replaced = find_replace_variables(expr, polars_wrapper)
-    return eval(replaced)
-
-
-def apply_method(method, args, df):
-    """Apply a single method to the dataframe."""
-    if method == "select":
-        return df.select(pl.col(*args))
-    elif method == "upper":
-        return df.with_columns(pl.col(*args).str.to_uppercase())
-    elif method == "lower":
-        return df.with_columns(pl.col(*args).str.to_lowercase())
-    elif method == "strlen":
-        return df.with_columns(pl.col(*args).str.len_chars().alias(f"{args[0]}_length"))
-    elif method == "where":
-        polars_expr = convert_to_polars_expr(args[0])
-        return df.filter(polars_expr)
-    elif method == "head":
-        n = args[0] if args else 5
-        return df.head(n)
-    elif method == "tail":
-        n = args[0] if args else 5
-        return df.tail(n)
-    elif method == "count":
-        return df.select(pl.count())
-    elif method == "columns":
-        return df.columns
-    elif method == "min":
-        return df.select(pl.col(*args).min())
-    elif method == "max":
-        return df.select(pl.col(*args).max())
-    elif method == "sum":
-        return df.select(pl.col(*args).sum())
-    elif method == "strjoin":
-        separator = args[1] if len(args) > 1 else ""
-        return df.select(pl.col(args[0]).str.join(separator).alias(f"{args[0]}_joined"))
-    elif method == "uniq":
-        # Return unique values from the specified column
-        return df.select(pl.col(args[0]).unique())
-    elif method == "uniqc":
-        return df.group_by(*args).agg(pl.count())
-    elif method == "mean":
-        return df.select(pl.col(*args).mean())
-    elif method == "median":
-        return df.select(pl.col(*args).median())
-    elif method == "mode":
-        return df.select(pl.col(*args).mode())
-    elif method == "first":
-        return df.select(pl.col(*args).first())
-    elif method == "last":
-        return df.select(pl.col(*args).last())
-    elif method == "std":
-        return df.select(pl.col(*args).std())
-    elif method == "var":
-        return df.select(pl.col(*args).var())
-    elif method == "round":
-        decimals = args[1] if len(args) > 1 else 0
-        return df.with_columns(pl.col(args[0]).round(decimals))
-    elif method == "sortby":
-        descending = args[1] if len(args) > 1 and isinstance(args[1], bool) else False
-        return df.sort(by=args[0], descending=descending)
-    else:
-        raise ValueError(f"Unknown method: {method}")
-
-
-def parse_chain(expression, df):
-    """Parse a chain of operations and apply them to the dataframe."""
-    calls = expression.split(".")
-    result = df
-    for call in calls:
-        call = call.strip()
-        match = re.match(r"(\w+)\((.*?)\)$", call)
-        method, args_str = match.group(1), match.group(2)
-        args = parse_arguments(args_str)
-        result = apply_method(method, args, result)
-
-    return result
+from tabula_cli.plots import *
+from tabula_cli.stats import *
+from tabula_cli.tables import *
 
 
 @click.command()
@@ -254,7 +35,7 @@ def main(expression, input_file, type, no_header, outtype):
     """Process a CSV or TSV file with a chain of operations.
 
     EXPRESSION is a chain of operations like select(col1,col2).method1().method2()...
-    
+
     \b
     Available methods:
     select(col1, col2, ...) - Select specific columns from the dataframe.
@@ -311,6 +92,241 @@ def main(expression, input_file, type, no_header, outtype):
     else:  # Default to CSV
         separator = ","
         click.echo(result.write_csv(separator=separator))
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.argument("input_file", type=click.File("r"), default="-")
+@click.option(
+    "--program",
+    "-p",
+    type=str,
+    required=True,
+    help="Script string, the parameters and columns to use in plotting",
+)
+@click.option(
+    "--output", "-o", type=str, help="File where you would like to save image output"
+)
+@click.option(
+    "--file",
+    "-f",
+    type=click.File("r"),
+    help="Script file. Instead of using a string, you can define the plotting parameters in a file",
+)
+@click.option(
+    "--separator",
+    "-s",
+    type=str,
+    default=",",
+    help="Separator for input data, default is ',' ",
+)
+@click.option(
+    "--columns",
+    "-c",
+    type=str,
+    default=None,
+    help="Column names for the input data, if not present in the file",
+)
+def plotx(
+    program: str,
+    columns: Optional[str],
+    input_file,
+    output: Optional[str],
+    file,
+    separator: str,
+) -> int:
+    """Terminal-based plotting with seaborn
+
+    Plot data from a tabular data file or from stdin, all from the terminal. An ideal
+    companion for awk, grep and other terminal-based processing tools. Uses seaborn as
+    a plotting interface, so for more information see the seaborn website
+    (https://seaborn.pydata.org/)
+
+    Plot types:
+      * relplot (default), kinds: scatter, line
+      * catplot, kinds: strip (default), swarm, box, violin, boxen, point, bar, count
+      * displot, kinds: hist (default), kde, ecdf
+      * pairplot
+
+    Define the plotting parameters and columns to use with a string.
+
+    Example: to plot a scatterplot of data with column names col1, col2, and coloured by
+    the value in col3:
+
+        gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2,hue:col3" -c "col1,col2,col3"
+
+    If no column names are defined via the --columns option, the first line of the file
+    is assumed to be the column names.
+    """
+    if file:
+        program = file.read()
+
+    try:
+        plot_type, plot_args = parse_script(program)
+    except Exception as e:
+        click.echo(f"Error: Invalid script format: {str(e)}")
+        return 1
+
+    try:
+        column_names = parse_columns(columns)
+        contents = input_file.read()
+        name_dict = {"names": column_names} if column_names else {}
+
+        df = pd.read_csv(StringIO(contents), sep=separator, **name_dict)
+        fig = plot_type(data=df, **plot_args)
+
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+
+        if output:
+            fig.figure.savefig(output)
+            click.echo(f"Plot saved to {output}")
+        else:
+            plt.show()
+        return 0
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        return 1
+
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.argument("input_file", type=click.File("r"), default="-")
+@click.option(
+    "--program",
+    "-p",
+    type=str,
+    required=True,
+    help="Script string, the parameters for the statistical test",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=str,
+    help="File where you would like to save the test output",
+)
+@click.option(
+    "--file",
+    "-f",
+    type=click.File("r"),
+    help="Script file. Instead of using a string, you can define the test parameters in a file",
+)
+@click.option(
+    "--separator",
+    "-s",
+    type=str,
+    default=",",
+    help="Separator for input data, default is ','",
+)
+@click.option(
+    "--columns",
+    "-c",
+    type=str,
+    default=None,
+    help="Column names for the input data, if not present in the file",
+)
+def statx(
+    program: str,
+    columns: Optional[str],
+    input_file: TextIO,
+    output: Optional[str],
+    file: Optional[TextIO],
+    separator: str,
+) -> int:
+    """
+    Terminal-based statistical testing with statsmodels
+
+    Perform statistical tests on tabular data (CSV or stdin) directly from the terminal.
+    Supported tests:
+      * ols: Ordinary Least Squares Regression. Required parameters: dependent, independent.
+      * logit: Logistic Regression. Required parameters: dependent, independent.
+      * ttest: Two-sample t-test. Required parameters: sample1, sample2. Optional: alternative (two-sided, larger, smaller).
+      * anova: ANOVA test. Required parameter: formula (e.g., "y ~ C(x)").
+      * glm: Generalized Linear Model. Required parameters: dependent, independent, family.
+        Optional parameters: link, alpha, var_power, power.
+
+    Define the test parameters using a script string. For example:
+
+        statx data.csv -p "test:ols,dependent:y,independent:x+z"
+
+    If no column names are provided via --columns, the first line of the file is assumed to be the header.
+    """
+    # If script is provided as a file, read it
+    if file:
+        try:
+            program = file.read()
+            if not program.strip():
+                click.echo("Error: Script file is empty")
+                return 1
+        except IOError as e:
+            click.echo(f"Error reading script file: {str(e)}")
+            return 1
+
+    # Parse the script string
+    try:
+        test_func, test_args = parse_script(program)
+    except ValueError as e:
+        click.echo(f"Error: Invalid script format: {str(e)}")
+        return 1
+
+    # Load and process data
+    try:
+        # Parse column names if provided
+        column_names = parse_columns(columns)
+
+        # Read input data
+        try:
+            contents = input_file.read()
+        except IOError as e:
+            click.echo(f"Error reading input file: {str(e)}")
+            return 1
+
+        # Parse CSV data
+        try:
+            # Prepare parameters for read_csv
+            params = {"sep": separator}
+            if column_names:
+                params["names"] = column_names
+
+            df = pd.read_csv(StringIO(contents), **params)
+            if df.empty:
+                click.echo("Error: Input data is empty")
+                return 1
+        except Exception as e:
+            click.echo(f"Error parsing CSV data: {str(e)}")
+            return 1
+
+        # Run the statistical test
+        try:
+            result = test_func(df, **test_args)
+        except InvalidColumnError as e:
+            click.echo(f"Error: {str(e)}")
+            return 1
+        except ModelError as e:
+            click.echo(f"Error in statistical model: {str(e)}")
+            return 1
+        except ValueError as e:
+            click.echo(f"Error: {str(e)}")
+            return 1
+        except Exception as e:
+            click.echo(f"Unexpected error: {str(e)}")
+            return 1
+
+        # Output results
+        if output:
+            try:
+                with open(output, "w") as f:
+                    f.write(result)
+                click.echo(f"Test result saved to {output}")
+            except IOError as e:
+                click.echo(f"Error writing to output file: {str(e)}")
+                return 1
+        else:
+            click.echo(result)
+
+        return 0
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        return 1
 
 
 if __name__ == "__main__":

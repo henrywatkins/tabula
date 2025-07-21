@@ -1,9 +1,110 @@
+"""CLI interface for statx."""
+
+from typing import Any, Callable, Dict, List, Optional, TextIO, Tuple
+
+import pandas as pd
+
+
+def parse_columns(column_string: Optional[str]) -> List[str]:
+    """Parse comma-separated column names into a list.
+
+    Args:
+        column_string: A comma-separated string of column names
+
+    Returns:
+        A list of column names.
+    """
+    if column_string:
+        return [col.strip() for col in column_string.strip().split(",")]
+    else:
+        return []
+
+
+def parse_script(
+    script_string: str,
+) -> Tuple[Callable[[pd.DataFrame, Any], str], Dict[str, Any]]:
+    """
+    Parse the script string and return the test function and its arguments.
+
+    The script string should be formatted as key:value pairs separated by commas.
+    Example:
+        "test:ols,dependent:y,independent:x+z"
+
+    Args:
+        script_string: The script string to parse
+
+    Returns:
+        A tuple containing:
+            - The test function to call
+            - A dictionary of arguments to pass to the function
+
+    Raises:
+        ValueError: If the script string is invalid or missing required parameters
+    """
+    if not script_string or not script_string.strip():
+        raise ValueError("Empty script string")
+
+    elements = script_string.strip()
+    try:
+        # Use split with maxsplit=1 for values in case they contain colons.
+        elements_dict = dict(
+            (item.split(":", 1)[0].strip(), item.split(":", 1)[1].strip())
+            for item in elements.split(",")
+        )
+    except IndexError:
+        raise ValueError(
+            "Invalid format. Expected 'key:value' pairs separated by commas"
+        )
+
+    # Map test types to their functions
+    test_types = {
+        "ols": run_ols,
+        "logit": run_logit,
+        "ttest": run_ttest,
+        "anova": run_anova,
+        "glm": run_glm,
+    }
+
+    # Default to "ols" if no test key is provided
+    if "test" not in elements_dict:
+        test_choice = "ols"
+    elif elements_dict["test"].lower() in test_types:
+        test_choice = elements_dict["test"].lower()
+    else:
+        raise ValueError(
+            f"Invalid test type. Supported tests: {', '.join(test_types.keys())}"
+        )
+
+    # Remove the test key from parameters
+    elements_dict.pop("test", None)
+
+    # Verify required parameters for each test
+    if test_choice in ["ols", "logit", "glm"]:
+        if "dependent" not in elements_dict or "independent" not in elements_dict:
+            raise ValueError(
+                f"{test_choice} requires 'dependent' and 'independent' parameters"
+            )
+        if test_choice == "glm" and "family" not in elements_dict:
+            raise ValueError(
+                "glm requires 'family' parameter (gaussian, binomial, poisson, gamma, etc.)"
+            )
+    elif test_choice == "ttest":
+        if "sample1" not in elements_dict or "sample2" not in elements_dict:
+            raise ValueError("ttest requires 'sample1' and 'sample2' parameters")
+    elif test_choice == "anova":
+        if "formula" not in elements_dict:
+            raise ValueError("anova requires 'formula' parameter")
+
+    return test_types[test_choice], elements_dict
+
+
 """Statistical models for statx.
 
 This module contains the statistical model functions used by the CLI.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 import pandas as pd
 
 
@@ -181,8 +282,8 @@ def run_anova(data: pd.DataFrame, formula: str, **kwargs: Any) -> str:
     Raises:
         ModelError: If the model fails to fit
     """
-    from statsmodels.formula.api import ols
     import statsmodels.api as sm
+    from statsmodels.formula.api import ols
 
     try:
         # Extract variables from formula to validate (basic check)
@@ -227,8 +328,8 @@ def run_glm(
         ValueError: If an invalid family or link is specified
         ModelError: If the model fails to fit
     """
-    import statsmodels.formula.api as smf
     import statsmodels.api as sm
+    import statsmodels.formula.api as smf
 
     # Validate columns
     validate_columns(data, dependent)

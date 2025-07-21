@@ -2,6 +2,7 @@
 
 import io
 import tempfile
+
 from click.testing import CliRunner
 from statx.cli import statx
 

@@ -1,9 +1,10 @@
 """Tests for the CLI interface."""
 
 import io
+
 import pytest
 from click.testing import CliRunner
-from statx.cli import statx, parse_script, parse_columns
+from statx.cli import parse_columns, parse_script, statx
 
 
 def test_version():

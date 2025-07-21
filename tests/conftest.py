@@ -1,8 +1,9 @@
 """Test configuration for statx."""
 
 import io
-import pytest
+
 import pandas as pd
+import pytest
 
 
 @pytest.fixture

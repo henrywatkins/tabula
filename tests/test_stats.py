@@ -1,7 +1,7 @@
 """Tests for the statistical functions."""
 
 import pytest
-from statx.stats import run_ols, run_logit, run_ttest, run_anova, run_glm
+from statx.stats import run_anova, run_glm, run_logit, run_ols, run_ttest
 
 
 def test_run_ols(sample_data):
