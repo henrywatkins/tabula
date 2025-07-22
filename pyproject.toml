@@ -1,7 +1,7 @@
 [project]
 name = "tabula-cli"
-version = "1.0.0"
-description = "Tabular manipulation on the command line"
+version = "2.0.0"
+description = "Tabular data manipulation, statistics and plotting on the command line"
 readme = "README.md"
 authors = [
     { name = "henrywatkins", email = "h.watkins@hotmail.com" }
