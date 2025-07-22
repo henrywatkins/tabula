@@ -3,24 +3,13 @@
 from typing import Any, Callable, Dict, List, Optional, TextIO, Tuple
 
 import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from statsmodels.formula.api import ols
+from statsmodels.stats.weightstats import ttest_ind
 
 
-def parse_columns(column_string: Optional[str]) -> List[str]:
-    """Parse comma-separated column names into a list.
-
-    Args:
-        column_string: A comma-separated string of column names
-
-    Returns:
-        A list of column names.
-    """
-    if column_string:
-        return [col.strip() for col in column_string.strip().split(",")]
-    else:
-        return []
-
-
-def parse_script(
+def parse_stats_script(
     script_string: str,
 ) -> Tuple[Callable[[pd.DataFrame, Any], str], Dict[str, Any]]:
     """
@@ -98,16 +87,6 @@ def parse_script(
     return test_types[test_choice], elements_dict
 
 
-"""Statistical models for statx.
-
-This module contains the statistical model functions used by the CLI.
-"""
-
-from typing import Any, Dict, Optional
-
-import pandas as pd
-
-
 class StatxError(Exception):
     """Base exception class for statx errors."""
 
@@ -159,7 +138,6 @@ def run_ols(data: pd.DataFrame, dependent: str, independent: str, **kwargs: Any)
         InvalidColumnError: If specified columns don't exist in data
         ModelError: If the model fails to fit
     """
-    import statsmodels.formula.api as smf
 
     # Validate that dependent variable exists in the data
     validate_columns(data, dependent)
@@ -198,7 +176,6 @@ def run_logit(
         InvalidColumnError: If specified columns don't exist in data
         ModelError: If the model fails to fit
     """
-    import statsmodels.formula.api as smf
 
     # Validate columns
     validate_columns(data, dependent)
@@ -240,7 +217,6 @@ def run_ttest(
         ModelError: If the test fails
         ValueError: If an invalid alternative is specified
     """
-    from statsmodels.stats.weightstats import ttest_ind
 
     # Validate that columns exist
     validate_columns(data, sample1, sample2)
@@ -282,8 +258,6 @@ def run_anova(data: pd.DataFrame, formula: str, **kwargs: Any) -> str:
     Raises:
         ModelError: If the model fails to fit
     """
-    import statsmodels.api as sm
-    from statsmodels.formula.api import ols
 
     try:
         # Extract variables from formula to validate (basic check)
@@ -328,8 +302,6 @@ def run_glm(
         ValueError: If an invalid family or link is specified
         ModelError: If the model fails to fit
     """
-    import statsmodels.api as sm
-    import statsmodels.formula.api as smf
 
     # Validate columns
     validate_columns(data, dependent)
@@ -367,7 +339,6 @@ def _get_family_object(family: str, kwargs: Dict[str, Any]) -> Any:
     Raises:
         ValueError: If an unsupported family is specified
     """
-    import statsmodels.api as sm
 
     # Convert family string to statsmodels family object
     family_map = {
@@ -406,7 +377,6 @@ def _apply_link_to_family(family_obj: Any, kwargs: Dict[str, Any]) -> Any:
     Raises:
         ValueError: If an unsupported link is specified
     """
-    import statsmodels.api as sm
 
     link_name = kwargs["link"].lower().replace("-", "_").replace(" ", "_")
     link_map = {

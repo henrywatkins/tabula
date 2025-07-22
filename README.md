@@ -1,9 +1,6 @@
 # Tabula
 
-Process tabular data on the command line
-
-## Overview
-Tabula provides a chain-based syntax for data manipulation operations. Methods can be chained together using dot notation: `method1().method2().method3()`. One can perform operations like selecting columns, filtering rows, transforming data, and aggregating results all on the command line.
+Process tabular data on the command line, apply statistical tests and create plots. Tabula is a command-line tool for manipulating and analyzing tabular data. It allows you to perform complex data operations using a simple expression syntax directly in your terminal.
 
 ## Installation
 Install Tabula using pip:
@@ -11,16 +8,25 @@ Install Tabula using pip:
 pip install tabula-cli
 ```
 
+The three main components of Tabula are:
+- **tabula**: For data manipulation and analysis
+- **tabula-plot**: For creating plots from tabular data
+- **tabula-stats**: For running statistical tests
+
+# Tabula
+
+Tabula provides a chain-based syntax for data manipulation operations. Methods can be chained together using dot notation: `method1().method2().method3()`. One can perform operations like selecting columns, filtering rows, transforming data, and aggregating results all on the command line.
+
 ## Data Selection Methods
 
 ### `select(col1, col2, ...)`
 Select specific columns from the dataset.
 ```bash
 # Select single column
-tabula "select(name)" data.csv
+tabula -p "select(name)" data.csv
 
 # Select multiple columns
-tabula "select(name, age, salary)" data.csv
+tabula -p "select(name, age, salary)" data.csv
 ```
 
 ## Data Transformation Methods
@@ -28,25 +34,25 @@ tabula "select(name, age, salary)" data.csv
 ### `upper(col)`
 Convert text in specified column to uppercase.
 ```bash
-tabula "select(name).upper(name)" data.csv
+tabula -p "select(name).upper(name)" data.csv
 ```
 
 ### `lower(col)`
 Convert text in specified column to lowercase.
 ```bash
-tabula "select(name).lower(name)" data.csv
+tabula -p "select(name).lower(name)" data.csv
 ```
 
 ### `strlen(col)`
 Calculate the length of strings in specified column.
 ```bash
-tabula "select(name).strlen(name)" data.csv
+tabula -p "select(name).strlen(name)" data.csv
 ```
 
 ### `round(col, decimals)`
 Round numeric values to specified decimal places.
 ```bash
-tabula "select(salary).round(salary, 2)" data.csv
+tabula -p "select(salary).round(salary, 2)" data.csv
 ```
 
 ## Filtering Methods
@@ -55,16 +61,16 @@ tabula "select(salary).round(salary, 2)" data.csv
 Filter rows based on conditions. Supports comparison operators and logical operators.
 ```bash
 # Simple condition
-tabula "where(age > 30)" data.csv
+tabula -p "where(age > 30)" data.csv
 
 # Multiple conditions with AND
-tabula "where(age > 25 & salary >= 50000)" data.csv
+tabula -p "where(age > 25 & salary >= 50000)" data.csv
 
 # Multiple conditions with OR
-tabula "where(department == 'IT' | department == 'HR')" data.csv
+tabula -p "where(department == 'IT' | department == 'HR')" data.csv
 
 # Complex conditions with parentheses
-tabula "where((age > 30 & department == 'IT') | salary < 40000)" data.csv
+tabula -p "where((age > 30 & department == 'IT') | salary < 40000)" data.csv
 ```
 
 ## Data Limiting Methods
@@ -72,13 +78,13 @@ tabula "where((age > 30 & department == 'IT') | salary < 40000)" data.csv
 ### `head(n)`
 Return the first n rows (default: 5).
 ```bash
-tabula "head(10)" data.csv
+tabula -p "head(10)" data.csv
 ```
 
 ### `tail(n)`
 Return the last n rows (default: 5).
 ```bash
-tabula "tail(3)" data.csv
+tabula -p "tail(3)" data.csv
 ```
 
 ## Sorting Methods
@@ -87,10 +93,10 @@ tabula "tail(3)" data.csv
 Sort data by specified column.
 ```bash
 # Ascending sort
-tabula "sortby(age)" data.csv
+tabula -p "sortby(age)" data.csv
 
 # Descending sort
-tabula "sortby(salary, True)" data.csv
+tabula -p "sortby(salary, True)" data.csv
 ```
 
 ## Aggregation Methods (Terminal)
@@ -98,37 +104,37 @@ tabula "sortby(salary, True)" data.csv
 ### `count()`
 Count the number of rows.
 ```bash
-tabula "count()" data.csv
-tabula "where(age > 30).count()" data.csv
+tabula -p "count()" data.csv
+tabula -p "where(age > 30).count()" data.csv
 ```
 
 ### `min(col)`, `max(col)`, `sum(col)`
 Calculate minimum, maximum, or sum of a column.
 ```bash
-tabula "min(age)" data.csv
-tabula "max(salary)" data.csv
-tabula "sum(salary)" data.csv
+tabula -p "min(age)" data.csv
+tabula -p "max(salary)" data.csv
+tabula -p "sum(salary)" data.csv
 ```
 
 ### `mean(col)`, `median(col)`, `mode(col)`
 Calculate statistical measures.
 ```bash
-tabula "mean(salary)" data.csv
-tabula "median(age)" data.csv
+tabula -p "mean(salary)" data.csv
+tabula -p "median(age)" data.csv
 ```
 
 ### `std(col)`, `var(col)`
 Calculate standard deviation and variance.
 ```bash
-tabula "std(salary)" data.csv
-tabula "var(age)" data.csv
+tabula -p "std(salary)" data.csv
+tabula -p "var(age)" data.csv
 ```
 
 ### `first(col)`, `last(col)`
 Get first or last value from a column.
 ```bash
-tabula "first(name)" data.csv
-tabula "last(name)" data.csv
+tabula -p "first(name)" data.csv
+tabula -p "last(name)" data.csv
 ```
 
 ## Unique Value Methods
@@ -136,13 +142,13 @@ tabula "last(name)" data.csv
 ### `uniq(col)`
 Get unique values from a column.
 ```bash
-tabula "uniq(department)" data.csv
+tabula -p "uniq(department)" data.csv
 ```
 
 ### `uniqc(col)`
 Count unique values (group by and count).
 ```bash
-tabula "uniqc(department)" data.csv
+tabula -p "uniqc(department)" data.csv
 ```
 
 ## String Methods
@@ -150,7 +156,7 @@ tabula "uniqc(department)" data.csv
 ### `strjoin(col, separator)`
 Join all values in a column with a separator.
 ```bash
-tabula "strjoin(name, ', ')" data.csv
+tabula -p "strjoin(name, ', ')" data.csv
 ```
 
 ## Utility Methods
@@ -158,7 +164,7 @@ tabula "strjoin(name, ', ')" data.csv
 ### `columns()`
 List all column names.
 ```bash
-tabula "columns()" data.csv
+tabula -p "columns()" data.csv
 ```
 
 ## Complete Example Workflow
@@ -172,7 +178,7 @@ tabula "columns()" data.csv
 # David,40,80000,IT
 
 # Complex analysis: Find IT employees over 30, show their names and salaries, sorted by salary
-tabula "where(department == 'IT' & age > 30).select(name, salary).sortby(salary)" data.csv
+tabula -p "where(department == 'IT' & age > 30).select(name, salary).sortby(salary)" data.csv
 
 # Output:
 # name,salary
@@ -195,40 +201,30 @@ Use the `-o` flag to specify output format:
 - `--outtype tsv`: Tab-separated values
 
 ```bash
-tabula "select(name, age)"
-
-
-# GullPlot
-
-Terminal-based plotting with seaborn. 
-
-## Installation
-
-```
-pip install gullplot
+tabula -p "select(name, age)"
 ```
 
-## Usage
+## tabula-plot
 
-GullPlot allows you to create plots from tabular data directly in the terminal. It's an ideal companion for command-line data processing tools like awk and grep.
+tabula-plot allows you to create plots from tabular data directly in the terminal. It's an ideal companion for command-line data processing tools like awk and grep.
 
 ### Basic Usage
 
 ```bash
 # Plot from a CSV file
-gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2,hue:col3"
+tabula-plot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2,hue:col3"
 
 # Plot from stdin (pipe data)
-cat data.csv | gullplot - -p "plot:relplot,kind:scatter,x:col1,y:col2"
+cat data.csv | tabula-plot - -p "plot:relplot,kind:scatter,x:col1,y:col2"
 
 # Save plot to a file
-gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2" -o plot.png
+tabula-plot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2" -o plot.png
 
 # Specify column names if they're not in the first row
-gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2" -c "col1,col2,col3"
+tabula-plot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2" -c "col1,col2,col3"
 
 # Use a different separator for CSV data
-gullplot data.tsv -p "plot:relplot,kind:scatter,x:col1,y:col2" -s "\t"
+tabula-plot data.tsv -p "plot:relplot,kind:scatter,x:col1,y:col2" -s "\t"
 ```
 
 ### Supported Plot Types
@@ -254,40 +250,11 @@ For example:
 plot:catplot,kind:violin,x:category,y:value,hue:group
 ```
 
-## Development
-
-```bash
-# Install development dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Format code
-hatch run fmt
-```
-
-## License
-
-MIT
-
-
-# statx
+## tabula-stats
 
 Statsmodels on the command line - a powerful CLI for running statistical tests directly in your terminal.
 
-## Installation
-
-```bash
-pip install statx
-```
-
-If you're using Rye:
-```bash
-rye add statx
-```
-
-## Features
+### Features
 
 - **Simple CLI interface**: Run statistical tests without writing Python code
 - **Multiple test types**: OLS, Logistic Regression, t-tests, ANOVA
@@ -298,13 +265,13 @@ rye add statx
 
 ```bash
 # Basic syntax
-statx [INPUT_FILE] -p "test:TYPE,PARAM1:VALUE1,PARAM2:VALUE2"
+tabula-stats [INPUT_FILE] -p "test:TYPE,PARAM1:VALUE1,PARAM2:VALUE2"
 
 # Example: OLS regression on data.csv
-statx data.csv -p "test:ols,dependent:y,independent:x+z"
+tabula-stats data.csv -p "test:ols,dependent:y,independent:x+z"
 
 # Read from stdin
-cat data.csv | statx -p "test:ttest,sample1:group1,sample2:group2"
+cat data.csv | tabula-stats -p "test:ttest,sample1:group1,sample2:group2"
 ```
 
 ## Supported Tests
@@ -312,7 +279,7 @@ cat data.csv | statx -p "test:ttest,sample1:group1,sample2:group2"
 ### Ordinary Least Squares (OLS) Regression
 
 ```bash
-statx data.csv -p "test:ols,dependent:y,independent:x+z+w"
+tabula-stats data.csv -p "test:ols,dependent:y,independent:x+z+w"
 ```
 
 Required parameters:
@@ -322,7 +289,7 @@ Required parameters:
 ### Logistic Regression
 
 ```bash
-statx data.csv -p "test:logit,dependent:binary_outcome,independent:x+z"
+tabula-stats data.csv -p "test:logit,dependent:binary_outcome,independent:x+z"
 ```
 
 Required parameters:
@@ -332,7 +299,7 @@ Required parameters:
 ### Generalized Linear Models (GLM)
 
 ```bash
-statx data.csv -p "test:glm,dependent:y,independent:x+z,family:poisson,link:log"
+tabula-stats data.csv -p "test:glm,dependent:y,independent:x+z,family:poisson,link:log"
 ```
 
 Required parameters:
@@ -363,19 +330,19 @@ Optional parameters:
 Examples:
 ```bash
 # Poisson regression with log link
-statx data.csv -p "test:glm,dependent:count,independent:x+z,family:poisson"
+tabula-stats data.csv -p "test:glm,dependent:count,independent:x+z,family:poisson"
 
 # Gamma regression with log link
-statx data.csv -p "test:glm,dependent:duration,independent:x+z,family:gamma"
+tabula-stats data.csv -p "test:glm,dependent:duration,independent:x+z,family:gamma"
 
 # Binomial regression with probit link
-statx data.csv -p "test:glm,dependent:success,independent:x+z,family:binomial,link:probit"
+tabula-stats data.csv -p "test:glm,dependent:success,independent:x+z,family:binomial,link:probit"
 ```
 
 ### Two-sample t-test
 
 ```bash
-statx data.csv -p "test:ttest,sample1:group1,sample2:group2,alternative:two-sided"
+tabula-stats data.csv -p "test:ttest,sample1:group1,sample2:group2,alternative:two-sided"
 ```
 
 Required parameters:
@@ -388,23 +355,7 @@ Optional parameters:
 ### ANOVA
 
 ```bash
-statx data.csv -p "test:anova,formula:y ~ C(group)"
-```
-
-Required parameters:
-- `formula`: Statistical formula using patsy/statsmodels syntax
-
-## Options
-
-```
-Options:
-  --version             Show the version and exit.
-  -p, --program TEXT    Script string, the parameters for the statistical test [required]
-  -o, --output TEXT     File where you would like to save the test output
-  -f, --file FILENAME   Script file. Instead of using a string, you can define the test parameters in a file
-  -s, --separator TEXT  Separator for input data, default is ','
-  -c, --columns TEXT    Column names for the input data, if not present in the file
-  -h, --help            Show this message and exit.
+tabula-stats data.csv -p "test:anova,formula:y ~ C(group)"
 ```
 
 ## Examples
@@ -419,7 +370,7 @@ x,y,group
 3,6.3,B
 4,8.1,B
 
-$ statx data.csv -p "test:ols,dependent:y,independent:x"
+$ tabula-stats data.csv -p "test:ols,x:y,y:x"
 ```
 
 ### CSV without headers
@@ -431,19 +382,11 @@ $ cat data_no_header.csv
 3,6.3,B
 4,8.1,B
 
-$ statx data_no_header.csv -p "test:ols,dependent:y,independent:x" -c "x,y,group"
+$ tabula-stats data_no_header.csv -p "test:ols,x:y,indepenydent:x" 
 ```
 
 ### Saving output to file
 
 ```bash
-$ statx data.csv -p "test:ols,dependent:y,independent:x" -o results.txt
+$ tabula-stats data.csv -p "test:ols,dependent:y,independent:x" > results.txt
 ```
-
-## Development
-
-See the [contributing guidelines](CONTRIBUTING.md) for information on reporting issues, feature requests, and development setup.
-
-## License
-
-[MIT License](LICENSE)

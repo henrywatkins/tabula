@@ -5,22 +5,7 @@ import seaborn as sns
 sns.set_style("whitegrid")
 
 
-def parse_columns(column_string: Optional[str]) -> List[str]:
-    """Parse comma-separated column names into a list.
-
-    Args:
-        column_string: A comma-separated string of column names
-
-    Returns:
-        A list of column names
-    """
-    if column_string:
-        return column_string.strip().split(",")
-    else:
-        return []
-
-
-def parse_script(script_string: str) -> Tuple[Callable, Dict[str, Any]]:
+def parse_plots_script(script_string: str) -> Tuple[Callable, Dict[str, Any]]:
     """Parse the script string and return the plot function and arguments.
 
     Args:

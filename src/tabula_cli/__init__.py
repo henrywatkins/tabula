@@ -11,8 +11,7 @@ from tabula_cli.stats import *
 from tabula_cli.tables import *
 
 
-@click.command()
-@click.argument("expression")
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("input_file", type=click.File("r"), default="-")
 @click.option(
     "-t",
@@ -22,8 +21,15 @@ from tabula_cli.tables import *
     help="Type of input file: csv or tsv",
 )
 @click.option(
+    "--program",
+    "-p",
+    type=str,
+    required=True,
+    help="Script string, the parameters and columns to use in plotting",
+)
+@click.option(
     "-o",
-    "--outtype",
+    "--output",
     type=click.Choice(["polars", "csv", "tsv"], case_sensitive=False),
     default="polars",
     help="Type of output format: polars, csv or tsv",
@@ -31,7 +37,7 @@ from tabula_cli.tables import *
 @click.option(
     "--no-header", is_flag=True, help="If the input file does not contain header names"
 )
-def main(expression, input_file, type, no_header, outtype):
+def main(program, input_file, type, no_header, output: str) -> None:
     """Process a CSV or TSV file with a chain of operations.
 
     EXPRESSION is a chain of operations like select(col1,col2).method1().method2()...
@@ -73,20 +79,20 @@ def main(expression, input_file, type, no_header, outtype):
         click.echo("Input file is empty or contains no data.", err=True)
         return
 
-    if not validate_chain(expression):
+    if not validate_chain(program):
         click.echo(
             "Invalid expression format. Double check expression syntax.", err=True
         )
         return
 
     try:
-        result = parse_chain(expression, df)
+        result = parse_chain(program, df)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         return
-    if outtype.lower() == "polars":
+    if output.lower() == "polars":
         click.echo(result)
-    elif outtype.lower() == "tsv":
+    elif output.lower() == "tsv":
         separator = "\t"
         click.echo(result.write_csv(separator=separator))
     else:  # Default to CSV
@@ -107,32 +113,21 @@ def main(expression, input_file, type, no_header, outtype):
     "--output", "-o", type=str, help="File where you would like to save image output"
 )
 @click.option(
-    "--file",
-    "-f",
-    type=click.File("r"),
-    help="Script file. Instead of using a string, you can define the plotting parameters in a file",
+    "-t",
+    "--type",
+    type=click.Choice(["csv", "tsv"], case_sensitive=False),
+    default="csv",
+    help="Type of input file: csv or tsv",
 )
 @click.option(
-    "--separator",
-    "-s",
-    type=str,
-    default=",",
-    help="Separator for input data, default is ',' ",
-)
-@click.option(
-    "--columns",
-    "-c",
-    type=str,
-    default=None,
-    help="Column names for the input data, if not present in the file",
+    "--no-header", is_flag=True, help="If the input file does not contain header names"
 )
 def plotx(
     program: str,
-    columns: Optional[str],
     input_file,
     output: Optional[str],
-    file,
-    separator: str,
+    type: str,
+    no_header: bool,
 ) -> int:
     """Terminal-based plotting with seaborn
 
@@ -152,26 +147,27 @@ def plotx(
     Example: to plot a scatterplot of data with column names col1, col2, and coloured by
     the value in col3:
 
-        gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2,hue:col3" -c "col1,col2,col3"
+        gullplot data.csv -p "plot:relplot,kind:scatter,x:col1,y:col2,hue:col3"
 
-    If no column names are defined via the --columns option, the first line of the file
-    is assumed to be the column names.
+    If the --no-header option is passed, the input file is assumed to not have header names.
+    In this case, the columns will be named column_1, column_2, etc
     """
-    if file:
-        program = file.read()
-
+    separator = "," if type.lower() == "csv" else "\t"
     try:
-        plot_type, plot_args = parse_script(program)
+        plot_type, plot_args = parse_plots_script(program)
     except Exception as e:
         click.echo(f"Error: Invalid script format: {str(e)}")
         return 1
 
     try:
-        column_names = parse_columns(columns)
         contents = input_file.read()
-        name_dict = {"names": column_names} if column_names else {}
+        if no_header:
+            df = pd.read_csv(StringIO(contents), sep=separator, header=None)
+            name_dict = {i: f"column_{i+1}" for i in df.columns}
+            df.rename(columns=name_dict, inplace=True)
+        else:
+            df = pd.read_csv(StringIO(contents), sep=separator, header="infer")
 
-        df = pd.read_csv(StringIO(contents), sep=separator, **name_dict)
         fig = plot_type(data=df, **plot_args)
 
         plt.xticks(rotation=45, ha="right")
@@ -198,38 +194,20 @@ def plotx(
     help="Script string, the parameters for the statistical test",
 )
 @click.option(
-    "--output",
-    "-o",
-    type=str,
-    help="File where you would like to save the test output",
+    "-t",
+    "--type",
+    type=click.Choice(["csv", "tsv"], case_sensitive=False),
+    default="csv",
+    help="Type of input file: csv or tsv",
 )
 @click.option(
-    "--file",
-    "-f",
-    type=click.File("r"),
-    help="Script file. Instead of using a string, you can define the test parameters in a file",
-)
-@click.option(
-    "--separator",
-    "-s",
-    type=str,
-    default=",",
-    help="Separator for input data, default is ','",
-)
-@click.option(
-    "--columns",
-    "-c",
-    type=str,
-    default=None,
-    help="Column names for the input data, if not present in the file",
+    "--no-header", is_flag=True, help="If the input file does not contain header names"
 )
 def statx(
     program: str,
-    columns: Optional[str],
     input_file: TextIO,
-    output: Optional[str],
-    file: Optional[TextIO],
-    separator: str,
+    type: str,
+    no_header: bool,
 ) -> int:
     """
     Terminal-based statistical testing with statsmodels
@@ -247,30 +225,20 @@ def statx(
 
         statx data.csv -p "test:ols,dependent:y,independent:x+z"
 
-    If no column names are provided via --columns, the first line of the file is assumed to be the header.
+    If --no-header is passed as an option, the input file is assumed to not have header names.
+    In this case, the columns will be named column_1, column_2, etc
     """
-    # If script is provided as a file, read it
-    if file:
-        try:
-            program = file.read()
-            if not program.strip():
-                click.echo("Error: Script file is empty")
-                return 1
-        except IOError as e:
-            click.echo(f"Error reading script file: {str(e)}")
-            return 1
 
     # Parse the script string
     try:
-        test_func, test_args = parse_script(program)
+        test_func, test_args = parse_stats_script(program)
     except ValueError as e:
         click.echo(f"Error: Invalid script format: {str(e)}")
         return 1
 
+    separator = "," if type.lower() == "csv" else "\t"
     # Load and process data
     try:
-        # Parse column names if provided
-        column_names = parse_columns(columns)
 
         # Read input data
         try:
@@ -282,11 +250,12 @@ def statx(
         # Parse CSV data
         try:
             # Prepare parameters for read_csv
-            params = {"sep": separator}
-            if column_names:
-                params["names"] = column_names
-
-            df = pd.read_csv(StringIO(contents), **params)
+            if no_header:
+                df = pd.read_csv(StringIO(contents), sep=separator, header=None)
+                name_dict = {i: f"column_{i+1}" for i in df.columns}
+                df.rename(columns=name_dict, inplace=True)
+            else:
+                df = pd.read_csv(StringIO(contents), sep=separator, header="infer")
             if df.empty:
                 click.echo("Error: Input data is empty")
                 return 1
@@ -310,17 +279,7 @@ def statx(
             click.echo(f"Unexpected error: {str(e)}")
             return 1
 
-        # Output results
-        if output:
-            try:
-                with open(output, "w") as f:
-                    f.write(result)
-                click.echo(f"Test result saved to {output}")
-            except IOError as e:
-                click.echo(f"Error writing to output file: {str(e)}")
-                return 1
-        else:
-            click.echo(result)
+        click.echo(result)
 
         return 0
 

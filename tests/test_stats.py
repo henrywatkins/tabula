@@ -1,7 +1,58 @@
 """Tests for the statistical functions."""
 
 import pytest
-from statx.stats import run_anova, run_glm, run_logit, run_ols, run_ttest
+
+from tabula_cli.stats import (parse_stats_script, run_anova, run_glm,
+                              run_logit, run_ols, run_ttest)
+
+
+def test_parse_script():
+    """Test the parse_script function."""
+    # OLS test
+    func, args = parse_stats_script("test:ols,dependent:y,independent:x")
+    assert func.__name__ == "run_ols"
+    assert args == {"dependent": "y", "independent": "x"}
+
+    # Logit test
+    func, args = parse_stats_script("test:logit,dependent:y,independent:x+z")
+    assert func.__name__ == "run_logit"
+    assert args == {"dependent": "y", "independent": "x+z"}
+
+    # t-test with alternative
+    func, args = parse_stats_script("test:ttest,sample1:a,sample2:b,alternative:larger")
+    assert func.__name__ == "run_ttest"
+    assert args == {"sample1": "a", "sample2": "b", "alternative": "larger"}
+
+    # ANOVA test
+    func, args = parse_stats_script("test:anova,formula:y ~ C(group)")
+    assert func.__name__ == "run_anova"
+    assert args == {"formula": "y ~ C(group)"}
+
+    # Default to OLS if test not specified
+    func, args = parse_stats_script("dependent:y,independent:x")
+    assert func.__name__ == "run_ols"
+    assert args == {"dependent": "y", "independent": "x"}
+
+
+def test_invalid_script_format():
+    """Test the parse_script function with invalid input."""
+    with pytest.raises(ValueError, match="Empty script string"):
+        parse_stats_script("")
+
+    with pytest.raises(ValueError, match="Invalid format"):
+        parse_stats_script("test,dependent:y,independent:x")
+
+    with pytest.raises(ValueError, match="Invalid test type"):
+        parse_stats_script("test:invalid,dependent:y,independent:x")
+
+    with pytest.raises(ValueError, match="ols requires 'dependent' and 'independent'"):
+        parse_stats_script("test:ols,dependent:y")
+
+    with pytest.raises(ValueError, match="ttest requires 'sample1' and 'sample2'"):
+        parse_stats_script("test:ttest,sample1:a")
+
+    with pytest.raises(ValueError, match="anova requires 'formula'"):
+        parse_stats_script("test:anova")
 
 
 def test_run_ols(sample_data):

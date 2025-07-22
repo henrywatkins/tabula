@@ -222,7 +222,7 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["select(name)", temp_file])
+            result = runner.invoke(main, ["-p", "select(name)", temp_file])
             assert result.exit_code == 0
             assert "Alice" in result.output
             assert "Bob" in result.output
@@ -241,7 +241,7 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["head(2)", temp_file])
+            result = runner.invoke(main, ["-p", "head(2)", temp_file])
             assert result.exit_code == 0
             # Should only show 2 rows (plus header info)
             assert "Alice" in result.output
@@ -260,7 +260,9 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["select(column_1)", temp_file, "--no-header"])
+            result = runner.invoke(
+                main, ["-p", "select(column_1)", temp_file, "--no-header"]
+            )
             assert result.exit_code == 0
             assert "Alice" in result.output
             assert "Bob" in result.output
@@ -273,7 +275,7 @@ class TestCLI:
 
         csv_content = "name,age\nAlice,25\nBob,30\n"
 
-        result = runner.invoke(main, ["select(name)"], input=csv_content)
+        result = runner.invoke(main, ["-p", "select(name)"], input=csv_content)
         assert result.exit_code == 0
         assert "Alice" in result.output
         assert "Bob" in result.output
@@ -289,7 +291,7 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["invalid_method()", temp_file])
+            result = runner.invoke(main, ["-p", "invalid_method()", temp_file])
             assert result.exit_code == 0
             assert "Invalid expression format" in result.output
         finally:
@@ -306,7 +308,7 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["select(name,age).head(2)", temp_file])
+            result = runner.invoke(main, ["-p", "select(name,age).head(2)", temp_file])
             assert result.exit_code == 0
             assert "Alice" in result.output
             assert "Bob" in result.output
@@ -323,7 +325,7 @@ class TestCLI:
             temp_file = f.name
 
         try:
-            result = runner.invoke(main, ["select(name)", temp_file])
+            result = runner.invoke(main, ["-p", "select(name)", temp_file])
             assert result.exit_code == 0
             assert "Input file is empty" in result.output
         finally:
